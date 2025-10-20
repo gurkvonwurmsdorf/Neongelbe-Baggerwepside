@@ -1,266 +1,440 @@
-import React, { useMemo, useState } from "react";
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>NEON-BAGGER-SHOW</title>
+  <style>
+    :root {
+      --neon: #F7FF00;
+      --glow: rgba(247,255,0,0.55);
+    }
+    * { box-sizing: border-box; }
+    html, body { height: 100%; }
+    body {
+      margin: 0; background:#000; color:var(--neon);
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+      text-shadow: 0 0 6px var(--glow);
+      overflow: hidden;
+    }
+    /* Layout */
+    header {
+      position: relative; z-index: 10;
+      display:flex; justify-content: space-between; align-items:center;
+      padding: 16px 24px;
+    }
+    .grid {
+      position: relative; z-index: 10;
+      display: grid; grid-template-columns: 360px 1fr;
+      gap: 24px; padding: 0 24px 64px;
+    }
+    aside.panel {
+      transition: opacity .3s, transform .3s;
+    }
+    .card {
+      border:1px solid var(--neon); border-radius:24px; background: rgba(247,255,0,0.06);
+      box-shadow: 0 0 18px var(--glow) inset, 0 0 20px var(--glow);
+      padding:16px;
+    }
+    .stage {
+      border:1px solid var(--neon); border-radius:24px;
+      background: rgba(247,255,0,0.04);
+      box-shadow: 0 0 30px var(--glow) inset, 0 0 24px var(--glow);
+      padding: 24px;
+    }
+    .boxes {
+      display:grid; grid-template-columns: repeat(3,1fr); gap:24px;
+    }
+    .box {
+      border:1px solid var(--neon); border-radius:24px; background:#0a0a0a;
+      box-shadow: 0 0 24px var(--glow) inset, 0 0 18px var(--glow);
+      padding:16px;
+    }
+    textarea {
+      width:100%; border-radius:14px; padding:10px; outline:none;
+      background:#000; color:var(--neon); border:1px solid var(--neon);
+      box-shadow: 0 0 12px var(--glow) inset;
+      resize: vertical;
+    }
+    button.neon {
+      padding: 8px 12px; border-radius: 12px;
+      border: 1px solid var(--neon); background: transparent; color: var(--neon);
+      box-shadow: 0 0 12px var(--glow) inset, 0 0 12px var(--glow);
+      cursor: pointer;
+    }
+    footer {
+      position: relative; z-index: 10; text-align:center;
+      padding: 18px 0; opacity: .8; font-size:12px; letter-spacing: 2px;
+    }
 
-// Neon helpers
-const neonYellow = "#F7FF00"; // sehr grell
-const neonGlow = `${neonYellow}80`;
+    /* Overlays/Containers */
+    .bagger-field { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
+    .bagger-field > div { position:absolute; }
+    .megabagger { position: fixed; left: -30vw; width: 25vw; z-index: 5;
+      filter: drop-shadow(0 0 24px rgba(247,255,0,0.95));
+      animation: passby 5s linear 0s 1 forwards;
+    }
+    .flash {
+      position: fixed; inset: 0; background: var(--neon);
+      opacity: 0; pointer-events: none; z-index: 9999; mix-blend-mode: screen;
+      transition: opacity 120ms ease-out;
+    }
 
-// Einfaches Bagger‑SVG (stilisierter Bagger, inline, kein externes Asset)
-function Bagger({ size = 48 }) {
-  const s = size;
-  return (
-    <svg
-      width={s}
-      height={s}
-      viewBox="0 0 100 100"
-      aria-label="Bagger"
-      role="img"
-      className="drop-shadow-[0_0_6px_rgba(247,255,0,0.8)]"
-    >
-      {/* Schaufel */}
-      <path d="M78 58 C88 52, 94 56, 96 64 C98 72, 92 78, 84 76 C76 74, 74 64, 78 58 Z" fill={neonYellow} stroke="#111" strokeWidth="2"/>
-      {/* Arm */}
-      <rect x="58" y="44" width="8" height="22" rx="3" fill={neonYellow} stroke="#111" strokeWidth="2"/>
-      <rect x="64" y="52" width="10" height="8" rx="2" fill={neonYellow} stroke="#111" strokeWidth="2"/>
-      {/* Kabine */}
-      <rect x="20" y="36" width="28" height="20" rx="3" fill={neonYellow} stroke="#111" strokeWidth="2"/>
-      <rect x="24" y="40" width="12" height="10" rx="2" fill="#111" stroke={neonYellow} strokeWidth="1"/>
-      {/* Body */}
-      <rect x="16" y="56" width="60" height="12" rx="3" fill={neonYellow} stroke="#111" strokeWidth="2"/>
-      {/* Kettenlaufwerk */}
-      <rect x="12" y="70" width="64" height="10" rx="5" fill={neonYellow} stroke="#111" strokeWidth="2"/>
-      {/* Räder als Akzente */}
-      <circle cx="24" cy="75" r="4" fill="#111"/>
-      <circle cx="38" cy="75" r="4" fill="#111"/>
-      <circle cx="52" cy="75" r="4" fill="#111"/>
-      <circle cx="66" cy="75" r="4" fill="#111"/>
-    </svg>
-  );
-}
+    /* SVG / Effekte */
+    .spin { animation: spin linear infinite; }
+    .blink { animation: blink 1.1s steps(2,end) infinite; }
+    .shake { animation: shake 0.2s infinite; }
+    .particle { position: fixed; border-radius:2px; pointer-events:none;
+      border:1px solid var(--neon); background:#000; box-shadow: 0 0 10px var(--glow);
+      animation: particle 0.6s ease-out forwards;
+    }
+    @keyframes blink { 50% { opacity: .35; } }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    @keyframes floatY { from { transform: translateY(0) } to { transform: translateY(12px) } }
+    @keyframes floatX { from { transform: translateX(0) } to { transform: translateX(10px) } }
+    @keyframes passby { from { transform: translateX(0vw) } to { transform: translateX(130vw) } }
+    @keyframes shake {
+      0%,100%{ transform: translate(0,0) rotate(0deg);}
+      25%{ transform: translate(1px,0.5px) rotate(0.2deg);}
+      50%{ transform: translate(-1px,-0.5px) rotate(-0.2deg);}
+      75%{ transform: translate(0.8px,-0.8px) rotate(0.1deg);}
+    }
+    @keyframes particle {
+      from { opacity: 1; transform: translate(0,0); }
+      to   { opacity: 0; transform: translate(12px, -24px); }
+    }
 
-function FloatingBaggerField({ count = 40 }) {
-  const items = useMemo(() => Array.from({ length: count }).map((_, i) => ({
-    id: i,
-    left: Math.random() * 100,
-    top: Math.random() * 100,
-    size: 32 + Math.random() * 40,
-    duration: 6 + Math.random() * 10,
-    delay: Math.random() * 5,
-    driftX: (Math.random() - 0.5) * 10,
-    driftY: (Math.random() - 0.5) * 10,
-  })), [count]);
+    /* responsive */
+    @media (max-width: 980px) {
+      .grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <!-- Flash beim Mega-Bagger -->
+  <div id="flash" class="flash"></div>
 
-  return (
-    <div className="absolute inset-0 overflow-hidden pointer-events-none">
-      {items.map((it) => (
-        <div
-          key={it.id}
-          style={{
-            position: "absolute",
-            left: `${it.left}%`,
-            top: `${it.top}%`,
-            animation: `floatY ${it.duration}s ease-in-out ${it.delay}s infinite alternate, floatX ${it.duration * 1.2}s ease-in-out ${it.delay / 2}s infinite alternate`,
-            filter: "drop-shadow(0 0 8px rgba(247,255,0,0.9))",
-          }}
-        >
-          <Bagger size={it.size} />
+  <!-- Interaktive, kleine Bagger -->
+  <div id="baggerField" class="bagger-field"></div>
+
+  <header>
+    <h1 style="margin:0; font-weight:900; letter-spacing:2px;">NEON-BAGGER-SHOW</h1>
+    <button id="togglePanel" class="neon">⚙️ Einstellungen</button>
+  </header>
+
+  <main class="grid">
+    <aside id="panel" class="panel">
+      <div class="card">
+        <div style="font-size:12px; font-weight:700; letter-spacing:2px; margin-bottom:8px;">Einstellungs-Menü</div>
+
+        <label style="font-size:12px; letter-spacing:1px;">Anzeige-Text</label>
+        <textarea id="textInput" rows="4">MEGA NEONGELB! VIELE BAGGER! ✦ ✦ ✦</textarea>
+
+        <div style="height:10px"></div>
+        <label style="font-size:12px; letter-spacing:1px;">Dreh-Speed</label>
+        <input id="speedRange" type="range" min="1" max="27" value="18" style="width:100%">
+        <div style="font-size:12px;">Aktuell: <b id="speedVal">18</b></div>
+
+        <div style="height:10px"></div>
+        <label style="font-size:12px; letter-spacing:1px;">Bagger-Menge</label>
+        <input id="countRange" type="range" min="8" max="140" value="64" style="width:100%">
+        <div style="font-size:12px;">Aktuell: <b id="countVal">64</b></div>
+
+        <div style="height:10px"></div>
+        <label style="font-size:12px; letter-spacing:1px;">Lautstärke</label>
+        <input id="volRange" type="range" min="0" max="1" step="0.01" value="0.90" style="width:100%">
+        <div style="display:flex; gap:8px; align-items:center; font-size:12px; margin-top:6px;">
+          <span>Pegel: <b id="volVal">90%</b></span>
+          <button id="muteBtn" class="neon">🔊 Laut</button>
         </div>
-      ))}
-    </div>
-  );
-}
-
-function CircularBlinkingText({ text, speed = 12 }) {
-  const content = text && text.trim().length > 0 ? text : "NEON‑BAGGER‑POWER ✦ NEON‑BAGGER‑POWER ✦ ";
-  const rotationDuration = Math.max(3, 30 - speed); // höherer Speed => kürzere Dauer
-  return (
-    <div className="relative w-full flex items-center justify-center">
-      <svg
-        className="animate-spin-slow select-none"
-        style={{ animationDuration: `${rotationDuration}s` }}
-        width="420"
-        height="420"
-        viewBox="0 0 200 200"
-      >
-        <defs>
-          <path id="circlePath" d="M100,100 m-80,0 a80,80 0 1,1 160,0 a80,80 0 1,1 -160,0" />
-        </defs>
-        <text
-          fill={neonYellow}
-          style={{
-            filter: `drop-shadow(0 0 6px ${neonGlow}) drop-shadow(0 0 12px ${neonGlow})`,
-          }}
-          className="font-bold tracking-wide"
-        >
-          <textPath href="#circlePath" startOffset="0%" textLength="502">
-            {content.repeat(6)}
-          </textPath>
-        </text>
-      </svg>
-      <div
-        className="absolute text-center px-6 py-4 rounded-2xl"
-        style={{
-          color: "#111",
-          background: neonYellow,
-          boxShadow: `0 0 16px ${neonGlow}, 0 0 32px ${neonGlow}`,
-          animation: "blink 1.1s steps(2, end) infinite",
-        }}
-      >
-        <div className="text-2xl font-extrabold">{content.slice(0, 26)}
-          {content.length > 26 ? "…" : ""}
-        </div>
-        <div className="text-xs uppercase tracking-widest">BLINKT & DREHT</div>
       </div>
-    </div>
-  );
-}
+    </aside>
 
-export default function NeonBaggerApp() {
-  const [open, setOpen] = useState(true);
-  const [displayText, setDisplayText] = useState("MEGA NEONGELB! VIELE BAGGER! ✦ ✦ ✦");
-  const [speed, setSpeed] = useState(18); // 1–27 (je schneller, desto kürzer die Rotationsdauer)
-  const [baggerCount, setBaggerCount] = useState(48);
-
-  return (
-    <div
-      className="min-h-screen w-full overflow-hidden"
-      style={{
-        background: "#000",
-        color: neonYellow,
-        textShadow: `0 0 6px ${neonGlow}`,
-      }}
-    >
-      {/* Globale Deko */}
-      <FloatingBaggerField count={baggerCount} />
-
-      {/* Header */}
-      <header className="relative z-10 flex items-center justify-between px-4 md:px-8 py-4">
-        <h1 className="text-2xl md:text-3xl font-extrabold uppercase tracking-widest drop-shadow-[0_0_10px_rgba(247,255,0,0.9)]">
-          NEON‑BAGGER‑SHOW
-        </h1>
-        <button
-          onClick={() => setOpen((v) => !v)}
-          className="px-4 py-2 rounded-xl font-bold border border-[var(--neon)]"
-          style={{
-            background: "transparent",
-            borderColor: neonYellow,
-            boxShadow: `0 0 12px ${neonGlow} inset, 0 0 12px ${neonGlow}`,
-          }}
-        >
-          ⚙️ Einstellungen
-        </button>
-      </header>
-
-      {/* Layout */}
-      <main className="relative z-10 grid md:grid-cols-[360px_1fr] gap-6 md:gap-8 px-4 md:px-8 pb-20">
-        {/* Sidebar / Settings */}
-        <aside
-          className={`transition-all duration-300 ${open ? "opacity-100 translate-x-0" : "opacity-0 -translate-x-4 pointer-events-none"}`}
-        >
-          <div
-            className="p-4 md:p-5 rounded-3xl space-y-4"
-            style={{
-              background: "rgba(247,255,0,0.06)",
-              boxShadow: `0 0 18px ${neonGlow} inset, 0 0 20px ${neonGlow}`,
-              border: `1px solid ${neonYellow}`,
-            }}
-          >
-            <div className="font-bold uppercase text-sm tracking-widest">Einstellungs‑Menü</div>
-
-            <label className="block text-xs uppercase tracking-widest">Anzeige‑Text</label>
-            <textarea
-              value={displayText}
-              onChange={(e) => setDisplayText(e.target.value)}
-              rows={4}
-              className="w-full rounded-2xl p-3 outline-none"
-              style={{
-                background: "#0a0a0a",
-                color: neonYellow,
-                boxShadow: `0 0 12px ${neonGlow} inset` ,
-                border: `1px solid ${neonYellow}`,
-              }}
-            />
-
-            <label className="block text-xs uppercase tracking-widest">Dreh‑Speed</label>
-            <input
-              type="range"
-              min={1}
-              max={27}
-              value={speed}
-              onChange={(e) => setSpeed(parseInt(e.target.value))}
-              className="w-full"
-            />
-            <div className="text-xs">Aktuell: <span className="font-bold">{speed}</span></div>
-
-            <label className="block text-xs uppercase tracking-widest">Bagger‑Menge</label>
-            <input
-              type="range"
-              min={8}
-              max={120}
-              value={baggerCount}
-              onChange={(e) => setBaggerCount(parseInt(e.target.value))}
-              className="w-full"
-            />
-            <div className="text-xs">Aktuell: <span className="font-bold">{baggerCount}</span></div>
+    <section style="display:grid; gap:24px;">
+      <div class="stage">
+        <!-- Kreis-Text -->
+        <div style="position:relative; width:100%; display:flex; justify-content:center;">
+          <svg id="circleSvg" class="spin" width="420" height="420" viewBox="0 0 200 200">
+            <defs>
+              <path id="circlePath" d="M100,100 m-80,0 a80,80 0 1,1 160,0 a80,80 0 1,1 -160,0" />
+            </defs>
+            <text fill="var(--neon)" style="filter: drop-shadow(0 0 6px var(--glow)) drop-shadow(0 0 12px var(--glow));">
+              <textPath id="circleText" href="#circlePath" startOffset="0%" textLength="502">
+                NEON-BAGGER-POWER ✦ NEON-BAGGER-POWER ✦ NEON-BAGGER-POWER ✦ NEON-BAGGER-POWER ✦ NEON-BAGGER-POWER ✦ NEON-BAGGER-POWER ✦
+              </textPath>
+            </text>
+          </svg>
+          <div class="blink"
+               style="position:absolute; text-align:center; padding:12px 18px; border-radius:16px;
+                      color:#111; background:var(--neon); box-shadow:0 0 16px var(--glow), 0 0 32px var(--glow);">
+            BLINKT & DREHT
           </div>
-        </aside>
+        </div>
+      </div>
 
-        {/* Bühne */}
-        <section className="space-y-6 md:space-y-8">
-          <div
-            className="rounded-3xl p-6 md:p-10"
-            style={{
-              background: "rgba(247,255,0,0.04)",
-              border: `1px solid ${neonYellow}`,
-              boxShadow: `0 0 30px ${neonGlow} inset, 0 0 24px ${neonGlow}`,
-            }}
-          >
-            <CircularBlinkingText text={displayText} speed={speed} />
-          </div>
+      <!-- Große Text-Kästen -->
+      <div class="boxes">
+        <div class="box">
+          <div style="font-size:12px; letter-spacing:2px; margin-bottom:6px;">Großer Kasten 1</div>
+          <textarea rows="8" placeholder="Schreibe hier deinen grellen Text…"></textarea>
+        </div>
+        <div class="box">
+          <div style="font-size:12px; letter-spacing:2px; margin-bottom:6px;">Großer Kasten 2</div>
+          <textarea rows="8" placeholder="Schreibe hier deinen grellen Text…"></textarea>
+        </div>
+        <div class="box">
+          <div style="font-size:12px; letter-spacing:2px; margin-bottom:6px;">Großer Kasten 3</div>
+          <textarea rows="8" placeholder="Schreibe hier deinen grellen Text…"></textarea>
+        </div>
+      </div>
+    </section>
+  </main>
 
-          {/* Große Kästen zum Reinschreiben */}
-          <div className="grid md:grid-cols-3 gap-6">
-            {[1,2,3].map((i) => (
-              <div
-                key={i}
-                className="p-4 rounded-3xl"
-                style={{
-                  background: "#0a0a0a",
-                  border: `1px solid ${neonYellow}`,
-                  boxShadow: `0 0 24px ${neonGlow} inset, 0 0 18px ${neonGlow}`,
-                }}
-              >
-                <div className="text-xs uppercase tracking-widest mb-2">Großer Kasten {i}</div>
-                <textarea
-                  placeholder="Schreibe hier deinen grellen Text…"
-                  rows={8}
-                  className="w-full rounded-2xl p-3 outline-none"
-                  style={{
-                    background: "#000",
-                    color: neonYellow,
-                    border: `1px solid ${neonYellow}`,
-                    boxShadow: `0 0 12px ${neonGlow} inset`,
-                  }}
-                />
-              </div>
-            ))}
-          </div>
-        </section>
-      </main>
+  <footer>MAXIMAL NEONGELB. MAXIMAL BAGGER. ✦</footer>
 
-      {/* Footer Hinweis */}
-      <footer className="relative z-10 text-center py-6 opacity-80 text-xs uppercase tracking-widest">
-        MAXIMAL NEONGELB. MAXIMAL BAGGER. ✦
-      </footer>
+  <script>
+    // -------------- Helpers / Audio --------------
+    const $ = (sel) => document.querySelector(sel);
+    const NEON = getComputedStyle(document.documentElement).getPropertyValue('--neon');
 
-      {/* Keyframes */}
-      <style>{`
-        :root { --neon: ${neonYellow}; }
-        @keyframes blink { 50% { opacity: 0.35; } }
-        @keyframes floatY { from { transform: translateY(0px) } to { transform: translateY(12px) } }
-        @keyframes floatX { from { transform: translateX(0px) } to { transform: translateX(10px) } }
-        .animate-spin-slow { animation: spin linear infinite; }
-        @keyframes spin { to { transform: rotate(360deg); } }
-      `}</style>
-    </div>
-  );
-}
+    const audio = (() => {
+      let ctx, master, gravelBus, engine = null, volume = 0.9, muted = false;
+
+      const ensure = () => {
+        if (!ctx) {
+          const Ctx = window.AudioContext || window.webkitAudioContext;
+          ctx = new Ctx();
+          master = ctx.createGain(); master.gain.value = muted ? 0 : volume; master.connect(ctx.destination);
+          gravelBus = ctx.createGain(); gravelBus.gain.value = 0; gravelBus.connect(master);
+        }
+        return ctx;
+      };
+
+      const noiseBuf = (type='brown') => {
+        const c = ensure(); const len = c.sampleRate * 2; const buf = c.createBuffer(1, len, c.sampleRate);
+        const d = buf.getChannelData(0); let last = 0;
+        for (let i=0;i<len;i++){ const w = Math.random()*2-1;
+          if (type==='brown'){ d[i]=(last+0.02*w)/1.02; last=d[i]; d[i]*=3.5; } else d[i]=w;
+        }
+        return buf;
+      };
+
+      const playClank = () => {
+        const c = ensure(); if (c.state==='suspended') c.resume();
+        const now = c.currentTime; const out = c.createGain(); out.connect(master);
+        const n = c.createBufferSource(); n.buffer = noiseBuf('white');
+        const bp = c.createBiquadFilter(); bp.type='bandpass'; bp.frequency.value=4000; bp.Q.value=5;
+        n.connect(bp).connect(out);
+        out.gain.setValueAtTime(0, now);
+        out.gain.linearRampToValueAtTime(1, now+0.01);
+        out.gain.exponentialRampToValueAtTime(0.001, now+0.25);
+        const osc = c.createOscillator(); const og = c.createGain();
+        osc.type='triangle'; osc.frequency.setValueAtTime(800, now);
+        osc.frequency.exponentialRampToValueAtTime(200, now+0.2);
+        og.gain.setValueAtTime(0.6, now); og.gain.exponentialRampToValueAtTime(0.001, now+0.22);
+        osc.connect(og).connect(out);
+        n.start(now); n.stop(now+0.3); osc.start(now); osc.stop(now+0.24);
+      };
+
+      const startEngine = (base=38) => {
+        const c = ensure(); if (c.state==='suspended') c.resume();
+        if (engine) return;
+        const n = c.createBufferSource(); n.buffer = noiseBuf('brown'); n.loop = true;
+        const lp = c.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value = 320;
+        const o = c.createOscillator(); o.type='sawtooth'; o.frequency.value=base;
+        const g = c.createGain(); g.gain.value = 0.5;
+        n.connect(lp).connect(g); o.connect(g); g.connect(master);
+        n.start(); o.start();
+        const lfo = c.createOscillator(); const lg = c.createGain(); lfo.frequency.value=3.2; lg.gain.value=12; lfo.connect(lg).connect(o.frequency); lfo.start();
+        engine = { n, o, g };
+      };
+
+      const rampEngine = (to=90, dur=2.0) => {
+        if (!ctx || !engine) return; const now = ctx.currentTime;
+        const f = engine.o.frequency; f.cancelScheduledValues(now); f.setValueAtTime(f.value, now); f.exponentialRampToValueAtTime(to, now+dur);
+      };
+
+      const stopEngine = () => {
+        if (!ctx || !engine) return; const now = ctx.currentTime;
+        const gg = engine.g.gain; gg.cancelScheduledValues(now); gg.setValueAtTime(gg.value, now); gg.exponentialRampToValueAtTime(0.0001, now+0.15);
+        setTimeout(()=>{ try{engine.n.stop()}catch{} try{engine.o.stop()}catch{} engine=null; },180);
+      };
+
+      const gravelBurst = () => {
+        const c = ensure(); if (c.state==='suspended') c.resume();
+        const now = c.currentTime;
+        const src = c.createBufferSource(); src.buffer = noiseBuf('white');
+        const bp = c.createBiquadFilter(); bp.type='bandpass'; bp.frequency.value=900; bp.Q.value=0.8;
+        const g = c.createGain(); g.gain.value = 0;
+        src.connect(bp).connect(g).connect(gravelBus);
+        g.gain.setValueAtTime(0.001, now);
+        g.gain.linearRampToValueAtTime(0.9, now+0.03);
+        g.gain.exponentialRampToValueAtTime(0.001, now+0.28);
+        gravelBus.gain.setValueAtTime(0.8, now);
+        gravelBus.gain.exponentialRampToValueAtTime(0.001, now+0.3);
+        src.start(now); src.stop(now+0.35);
+      };
+
+      const setVolume = (v) => { volume = v; if (master) master.gain.value = muted ? 0 : volume; };
+      const setMuted = (m) => { muted = m; if (master) master.gain.value = muted ? 0 : volume; };
+
+      return { playClank, startEngine, rampEngine, stopEngine, gravelBurst, setVolume, setMuted };
+    })();
+
+    // -------------- Bagger (SVG) --------------
+    function baggerSVG(size=48) {
+      const svgNS = "http://www.w3.org/2000/svg";
+      const s = document.createElementNS(svgNS, "svg");
+      s.setAttribute("width", size); s.setAttribute("height", size); s.setAttribute("viewBox","0 0 100 100");
+      const parts = `
+        <path d="M78 58 C88 52, 94 56, 96 64 C98 72, 92 78, 84 76 C76 74, 74 64, 78 58 Z" fill="${NEON}" stroke="#111" stroke-width="2"/>
+        <rect x="58" y="44" width="8" height="22" rx="3" fill="${NEON}" stroke="#111" stroke-width="2"/>
+        <rect x="64" y="52" width="10" height="8" rx="2" fill="${NEON}" stroke="#111" stroke-width="2"/>
+        <rect x="20" y="36" width="28" height="20" rx="3" fill="${NEON}" stroke="#111" stroke-width="2"/>
+        <rect x="24" y="40" width="12" height="10" rx="2" fill="#111" stroke="${NEON}" stroke-width="1"/>
+        <rect x="16" y="56" width="60" height="12" rx="3" fill="${NEON}" stroke="#111" stroke-width="2"/>
+        <rect x="12" y="70" width="64" height="10" rx="5" fill="${NEON}" stroke="#111" stroke-width="2"/>
+        <circle cx="24" cy="75" r="4" fill="#111"/><circle cx="38" cy="75" r="4" fill="#111"/>
+        <circle cx="52" cy="75" r="4" fill="#111"/><circle cx="66" cy="75" r="4" fill="#111"/>
+      `;
+      s.innerHTML = parts;
+      s.style.filter = "drop-shadow(0 0 10px rgba(247,255,0,0.95))";
+      return s;
+    }
+
+    function spawnParticle(x,y){
+      const el=document.createElement('span');
+      const size = 3 + Math.random()*4;
+      el.className='particle';
+      el.style.left = x+'px'; el.style.top = y+'px';
+      el.style.width = size+'px'; el.style.height = size+'px';
+      document.body.appendChild(el);
+      setTimeout(()=>el.remove(),700);
+    }
+
+    // -------------- Interaktives Feld mit kleinen Baggern --------------
+    const field = $('#baggerField');
+    function buildField(count=64){
+      field.innerHTML='';
+      for(let i=0;i<count;i++){
+        const wrap=document.createElement('div');
+        wrap.style.left = Math.random()*100+'%';
+        wrap.style.top  = Math.random()*100+'%';
+        const dur = 6 + Math.random()*10;
+        const del = Math.random()*5;
+        wrap.style.animation = `floatY ${dur}s ease-in-out ${del}s infinite alternate, floatX ${dur*1.2}s ease-in-out ${del/2}s infinite alternate`;
+
+        const inner=document.createElement('div'); // re-aktiviert pointer events
+        inner.style.pointerEvents='auto';
+        const s=32+Math.random()*40;
+        const svg=baggerSVG(s);
+        inner.appendChild(svg);
+
+        // Interaktion
+        let dragging=false;
+        inner.addEventListener('pointerdown',(e)=>{
+          dragging=true; inner.setPointerCapture(e.pointerId);
+          audio.startEngine(); audio.playClank();
+          if(navigator.vibrate) navigator.vibrate([10,20,10]);
+          inner.classList.add('shake'); spawnParticle(e.clientX,e.clientY);
+        });
+        inner.addEventListener('pointermove',(e)=>{
+          if(!dragging) return;
+          audio.gravelBurst();
+          spawnParticle(e.clientX+(Math.random()*14-7), e.clientY+(Math.random()*8-4));
+        });
+        inner.addEventListener('pointerup',(e)=>{
+          dragging=false; audio.stopEngine(); inner.classList.remove('shake');
+          if(navigator.vibrate) navigator.vibrate(20); spawnParticle(e.clientX,e.clientY);
+        });
+        inner.addEventListener('click',(e)=>{
+          audio.playClank(); if(navigator.vibrate) navigator.vibrate(15);
+          spawnParticle(e.clientX,e.clientY);
+        });
+
+        wrap.appendChild(inner);
+        field.appendChild(wrap);
+      }
+    }
+
+    // -------------- Mega-Bagger Durchfahrten + Flash --------------
+    const flash = $('#flash');
+    function triggerFlash(){
+      flash.style.opacity = .6;
+      setTimeout(()=> flash.style.opacity = 0, 280);
+    }
+    function spawnMegaBagger(){
+      const y = 10 + Math.random()*70; // 10–80% Höhe
+      const big = document.createElement('div');
+      big.className = 'megabagger';
+      big.style.top = y+'%';
+      big.appendChild(baggerSVG(240));
+      big.addEventListener('animationend', ()=> big.remove());
+      document.body.appendChild(big);
+
+      triggerFlash();
+      audio.startEngine(50);
+      audio.rampEngine(120, 2.4);
+      setTimeout(()=> audio.stopEngine(), 5200);
+    }
+    // Erster sofort, danach alle 20 s
+    setTimeout(spawnMegaBagger, 0);
+    setInterval(spawnMegaBagger, 20000);
+
+    // -------------- UI Bindings --------------
+    const panel = $('#panel');
+    const toggle = $('#togglePanel');
+    let panelOpen = true;
+    const setPanel = (open) => {
+      panelOpen = open;
+      panel.style.opacity = open ? 1 : 0;
+      panel.style.transform = open ? 'translateX(0)' : 'translateX(-8px)';
+      panel.style.pointerEvents = open ? 'auto' : 'none';
+    }
+    toggle.addEventListener('click', ()=> setPanel(!panelOpen));
+    setPanel(true);
+
+    // Text & Speed
+    const textInput = $('#textInput');
+    const circleText = $('#circleText');
+    const circleSvg  = $('#circleSvg');
+    const speedRange = $('#speedRange');
+    const speedVal   = $('#speedVal');
+    function updateText(){
+      const base = (textInput.value && textInput.value.trim().length>0) ? textInput.value.trim() : 'NEON-BAGGER-POWER ✦';
+      const content = Array(6).fill(base + ' ').join('');
+      circleText.textContent = content;
+    }
+    function updateSpeed(){
+      const v = parseInt(speedRange.value,10); speedVal.textContent = v;
+      const dur = Math.max(3, 30 - v);
+      circleSvg.style.animationDuration = dur + 's';
+    }
+    textInput.addEventListener('input', updateText); updateText();
+    speedRange.addEventListener('input', updateSpeed); updateSpeed();
+
+    // Count
+    const countRange = $('#countRange');
+    const countVal   = $('#countVal');
+    function updateCount(){
+      const c = parseInt(countRange.value,10); countVal.textContent = c; buildField(c);
+    }
+    countRange.addEventListener('input', updateCount); buildField(parseInt(countRange.value,10));
+
+    // Volume / Mute
+    const volRange = $('#volRange');
+    const volVal   = $('#volVal');
+    const muteBtn  = $('#muteBtn');
+    function updateVol(){
+      const v = parseFloat(volRange.value); volVal.textContent = Math.round(v*100)+'%';
+      audio.setVolume(v);
+    }
+    let muted = false;
+    muteBtn.addEventListener('click', ()=>{
+      muted = !muted; audio.setMuted(muted);
+      muteBtn.textContent = muted ? '🔇 Stumm' : '🔊 Laut';
+    });
+    volRange.addEventListener('input', updateVol); updateVol();
+  </script>
+</body>
+</html>
